@@ -1,0 +1,14 @@
+//If Vm, traces are NOT desired, run this one.
+
+load_file("CellTemplates.hoc")
+load_file("MakeNetwork.hoc")
+load_file("RunSim_NoEP.hoc")
+
+OutputData()
+
+saveSG()
+saveT()
+saveZ2()
+saveEX()
+
+quit()

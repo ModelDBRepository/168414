@@ -1,0 +1,202 @@
+//Modified by Tianhe Zhang from NEURON Book Chapter 11 (Carnevale and Hines) to import necessary values from connectivity files.
+//NOTE: For the "import spike times" simulation, spike times will be imported IN THE SIMULATION RUNNER ROUTINE.
+
+//This script is generally a black box i.e. nothing needs to be changed here when only altering the network/cell properties.  However, if a new parameter needs to be incorporated
+//(e.g. adding an "ERevVector.txt" import to run KCC2 simulations; see "importcritvalues()"), this should be altered to reflect changes.
+
+////////// import critical values ///////////////// Alteration from NEURON code earlier.  This will allow for parameters to be imported from MATLAB.
+
+objref InCells, InX, InY, InZ, InTypes, InFrom, InTo, InSynapse, InWeights, InDelays, InThresh
+objref CellsVec, XVec, YVec, ZVec, CellTypeVec, FromVec, ToVec,  SynapseVec, WeightsVec, DelaysVec, ThreshVec
+
+
+proc importcritvalues() { //These values (which define the cells and connectivities) of the neural network MUST be imported.
+
+	//Cells//
+	InCells = new File()
+	CellsVec = new Vector()
+	InCells.ropen("CellVector.txt")
+	CellsVec.scanf(InCells)
+	InCells.close()
+
+	//Cell Coordinates//
+	InX = new File()
+	XVec = new Vector()
+	InX.ropen("XVector.txt")
+	XVec.scanf(InX)
+	InX.close()
+
+	InY = new File()
+	YVec = new Vector()
+	InY.ropen("YVector.txt")
+	YVec.scanf(InY)
+	InY.close()
+
+	InZ = new File()
+	ZVec = new Vector()
+	InZ.ropen("ZVector.txt")
+	ZVec.scanf(InZ)
+	InZ.close()
+
+	//Cell Types//  CellTypeVec contains a list of indices corresponding to the indices of CellsVec where cell types switch.
+
+	InTypes = new File()
+	CellTypeVec = new Vector()
+	InTypes.ropen("CellTypeVector.txt")
+	CellTypeVec.scanf(InTypes)
+	InTypes.close()
+
+
+	//Connections//
+	InFrom = new File()
+	FromVec = new Vector()
+	InFrom.ropen("FromVector.txt")
+	FromVec.scanf(InFrom)
+	InFrom.close()
+
+	InTo = new File()
+	ToVec = new Vector()
+	InTo.ropen("ToVector.txt")
+	ToVec.scanf(InTo)
+	InTo.close()
+
+	InSynapse = new File()
+	SynapseVec = new Vector()
+	InSynapse.ropen("SynapseVector.txt")
+	SynapseVec.scanf(InSynapse)
+	InSynapse.close()
+
+	//
+}
+
+importcritvalues()
+
+//Import data regarding cell parameters (e.g. tau, intervals).  Not importing a value means default in NEURON is used, so optional (if value doesn't matter).
+
+//Import data regarding connection parameters (weights, delays, synaptic thresholds).  Not importing a value means default in NEURON is used.
+
+proc importWeights(){
+	InWeights = new File()
+	WeightsVec = new Vector()
+	InWeights.ropen("WeightVector.txt")
+	WeightsVec.scanf(InWeights)
+	InWeights.close()
+}
+
+proc importDelays(){
+	InDelays = new File()
+	DelaysVec = new Vector()
+	InDelays.ropen("DelayVector.txt")
+	DelaysVec.scanf(InDelays)
+	InDelays.close()
+}
+
+proc importThresh(){
+	InThresh = new File()
+	ThreshVec = new Vector()
+	InThresh.ropen("ThresholdVector.txt")
+	ThreshVec.scanf(InThresh)
+	InThresh.close()
+}
+
+//proc importERev(){  
+
+//Reversal potentials for synapses.  Commented out for Wind-Up simulations, but essential to reproduce KCC2 results.  Make sure synapses that use same ion
+//have same reversal potential (KCC2: rest potentials unaffected).
+
+//	InERev = new File()
+//	ERevVec = new Vector()
+//	InERev.ropen("ERevVector.txt")
+//	ERevVec.scanf(InERev)
+//	InERev.close()
+//}
+
+importWeights()
+importDelays()
+importThresh()
+
+//Greater than equal to.
+
+func ge() {
+  if ($1<$2) {
+    $1=$2
+  }
+  return $1
+}
+
+////////// create a network [NEURON generated] //////////
+// argument is desired number of cells
+
+objref CellTempFile
+strdef cmd
+
+proc createnet() { local p, q //Input 1: # of Cells.  Input 2: # of connections (not categorized yet.  NOTE THAT USER MUST MANUALLY CHANGE "cell_append" ACCORDING TO HOW MANY TYPES OF CELLS THERE ARE)
+  $1 = ge($1,2) // force net to have at least two cells
+  ncell = $1
+  // so we can make a new net without having to exit and restart
+  nclist.remove_all()
+  cells.remove_all()
+  CellTempFile = new File()
+  CellTempFile.ropen("CellTempList.dat")
+
+  for p = 1, CellTypeVec.size()-1{
+	  CellTempFile.gets(cmd) //Scan in relevant cell template command
+	  for q = CellTypeVec.x[p-1], CellTypeVec.x[p]-1{
+		j = q
+		execute1(cmd) //Run object generation command once for each relevant cell.  See "CellTempList.dat" for exact commands (list of "VARIABLE = new CELLCLASS").
+	  }
+  }
+  CellTempFile.close()
+
+  for p=0, $2-1 {  //Connect cells that were created above based on the layout described in the Connections Excel file.
+    nc_append(FromVec.x[p], ToVec.x[p], SynapseVec.x[p], WeightsVec.x[p], DelaysVec.x[p]) //CELL COUNT STARTS AT ZERO.
+	print p
+  }
+  objref netcon  // leave no loose ends (see nc_append())
+  strdef cmd     // same as above, but for strings.
+}
+
+////////// specify parameters for each individual connection in network//////////
+// call this settau() to avoid conflict with scalar tau
+
+proc settau() { local i
+	temp = $2
+    	if (temp>0) {
+    	cells.object($1).pp.tau = $2
+   	 }
+}
+
+// reworked for individual cells/connections.
+proc interval() { local i
+	temp = $2
+    	if (temp>0) {
+   	 cells.object($1).pp.invl = $2
+    	}
+}
+
+proc weight() { local i
+    nclist.object($1).weight = $2
+}
+
+proc delay() { local i
+  $2 = ge($2,0)  // min del is 0 ms
+  del = $2
+    nclist.object($1).delay = $2
+}
+
+proc thresh() { local i
+    nclist.object($1).threshold = $2
+}
+
+
+////////// actually execute the above.  Easier if encapsulated into a single process //////////
+createnet(CellsVec.size(), FromVec.size())
+
+proc ConnParamSetter(){ local k
+	for k=0, FromVec.size()-1{
+		weight(k, WeightsVec.x[k])
+		delay(k, DelaysVec.x[k])
+		thresh(k, ThreshVec.x[k])
+	}
+}
+ConnParamSetter()

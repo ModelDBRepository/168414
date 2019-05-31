@@ -1,0 +1,5 @@
+cell_append(new S_NetStim(), XVec.x[j], YVec.x[j], ZVec.x[j])
+cell_append(new MelnickSG(), XVec.x[j], YVec.x[j], ZVec.x[j])
+cell_append(new MelnickSG(), XVec.x[j], YVec.x[j], ZVec.x[j])
+cell_append(new AguiarIN(), XVec.x[j], YVec.x[j], ZVec.x[j])
+cell_append(new AguiarWDR(), XVec.x[j], YVec.x[j], ZVec.x[j])

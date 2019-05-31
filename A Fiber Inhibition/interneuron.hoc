@@ -1,0 +1,145 @@
+//Created by Paulo Aguiar [pauloaguiar@fc.up.pt]
+
+// IMPORTANT NOTE:
+// The iKCa current is not necessary but provide an idea on how activity control can be achieved.
+// The early, but truncated increase in the evoked APs results from the interaction between NK1R and iKCa
+// Remove the iKCa, but renormalize the inputs, if you want a slow and monotonic increase in the evoked APs
+
+// CREATE INTERNEURON
+
+begintemplate Interneuron
+
+public soma, dendrite, hillock, axon
+
+create soma, dendrite, hillock, axon
+
+proc init() {
+    
+    create soma
+    soma {    
+	nseg = 3  
+	L = 20.0
+	diam = 20.0
+	
+	//HH channels: iNat and iK
+	insert HH2 {
+	    gnabar_HH2 = 0.08
+	    gkbar_HH2 = 0.02
+	    vtraub_HH2 = -55.0
+	}
+	
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 1.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+	
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.002 //0.002
+	}
+	
+	ek = -70.0
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    create dendrite
+    dendrite {    
+	nseg = 5    
+	L = 500.0  
+	diam = 4.0
+	
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 2.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+	
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.002 //0.002
+	}
+	
+	ek = -70.0
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    
+    create hillock
+    hillock {   
+	nseg = 3  
+	L = 3.0
+	diam(0:1) = 2.0:1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 0.1
+	    gkbar_HH2 = 0.04
+	    vtraub_HH2 = -55.0
+	}
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    create axon
+    axon {    
+	nseg = 5
+	L = 1000.0
+	diam = 1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 0.1
+	    gkbar_HH2 = 0.04	//0.06
+	    vtraub_HH2 = -55
+	}
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    
+    //CONNECTIONS
+    soma connect hillock(0),1
+    hillock connect axon(0),1
+    soma connect dendrite(0),0 
+    
+}
+
+endtemplate Interneuron
+
+
+
+
+
+//************************************************************************************
+//UNITS	    
+//Category									Variable			Units
+//Time											t							[ms]
+//Voltage										v							[mV]
+//Current										i							[mA/cm2] (distributed)	[nA] (point process)
+//Concentration							ko, ki, etc.	[mM]
+//Specific capacitance			cm						[uf/cm2]
+//Length										diam, L				[um]
+//Conductance								g							[S/cm2] (distributed)	[uS] (point process)
+//Cytoplasmic resistivity		Ra						[ohm cm]
+//Resistance								Ri						[10E6 ohm]

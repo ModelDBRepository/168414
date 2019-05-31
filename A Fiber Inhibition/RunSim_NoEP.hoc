@@ -1,0 +1,248 @@
+load_file("nrngui.hoc")
+//load_file("MakeNetMATLAB.hoc")
+
+objref netcon, vec, spikes, nil, graster
+
+objref SpikeStatsFile, numspikes
+
+
+proc TempInit(){
+	celsius = 36 //According to Aguiar
+	dt = 0.0125 // Smaller than default 0.025ms dt.
+}
+
+TempInit()
+
+
+proc SynapseInit(){ //Initializes synapses by specifying the number of synapses and importing spike times.  Also sets tstop.
+	numspikes = new Vector()
+	SpikeStatsFile = new File()
+	SpikeStatsFile.ropen("SpikeStatsVector.txt")
+	numsources = SpikeStatsFile.scanvar()
+	numspikes.scanf(SpikeStatsFile, numsources)
+	tstop = SpikeStatsFile.scanvar()
+	SpikeStatsFile.close()
+
+}
+
+SynapseInit()
+
+objref SpikeVectorFile, SpikeVector[numspikes.size()]
+
+proc SynapseLoad(){ local k //Loads synapse event times into vectors, which will be themselves inserted into the appropriate synapse using the netcon.event command.
+
+	SpikeVectorFile = new File()
+	SpikeVectorFile.ropen("SpikeTimesVector.txt")
+	for k=0, numspikes.size()-1{
+		SpikeVector[k] = new Vector(numspikes.x[k], 0)
+		SpikeVector[k].scantil(SpikeVectorFile, -1e15)
+	}
+	SpikeVectorFile.close()
+}
+
+SynapseLoad()
+
+objref fih
+
+fih = new FInitializeHandler("loadqueue()")
+
+proc loadqueue() { local j
+	for k = 0, numspikes.size()-1 {
+		for j=0, numspikes.x[k]-1{
+			nclist.object(k).event(SpikeVector[k].x[j])
+		}
+	}
+}
+
+	
+proc run() {
+	stdinit()
+	continuerun(tstop)
+}
+
+proc init() { //Taken from Ch. 11 of Neuron book.  Mostly just initializes the raster plot.
+	finitialize(v_init)
+	if (cvode.active()) {
+		cvode.re_init()
+	} else {
+		fcurrent()
+	} frecord_init()
+}
+
+
+objref OutputVectorsSG, OutputVectorsSGM, OutputVectorsSGH, OutputTimesSG, netconSG, nil
+objref OutputVectorsZ2, OutputTimesZ2, netconZ2
+objref OutputVectorsT, OutputVectorsTM, OutputVectorsTH, OutputTimesT, netconT
+objref OutputVectorsEX, OutputVectorsEXM, OutputVectorsEXH, OutputTimesEX, netconEX
+
+
+proc OutputData(){ local i
+
+	//OutputVectorsSG = new Vector() //needs to be modified to accomodate multiple cells.
+	//OutputVectorsSGM = new Vector()
+	//OutputVectorsSGH = new Vector()
+	//OutputVectorsSG.record(&MelnickSG[0].soma.v(0.5))
+	//OutputVectorsSGM.record(&MelnickSG[0].soma.m_hh(0.5))
+	//OutputVectorsSGH.record(&MelnickSG[0].soma.h_hh(0.5))
+	OutputTimesSG = new Vector()
+	MelnickSG[0].soma netconSG = new NetCon(&v(0.5), nil)
+	netconSG.threshold = -30 //-30 mV AP threshold.
+	netconSG.record(OutputTimesSG)
+	objref netconSG
+
+	//OutputVectorsZ2 = new Vector() //needs to be modified to accomodate multiple cells.
+	//OutputVectorsZ2.record(&MelnickSG[1].soma.v(0.5))
+	OutputTimesZ2 = new Vector()
+	MelnickSG[1].soma netconZ2 = new NetCon(&v(0.5), nil)
+	netconZ2.threshold = -30 //-30 mV AP threshold.
+	netconZ2.record(OutputTimesZ2)
+	objref netconZ2	
+
+	//OutputVectorsT = new Vector() //needs to be modified to accomodate multiple cells.
+	//OutputVectorsTM = new Vector()
+	//OutputVectorsTH = new Vector()
+	//OutputVectorsT.record(&AguiarWDR[0].soma.v(0.5))
+	//OutputVectorsTM.record(&AguiarWDR[0].soma.m_hh(0.5))
+	//OutputVectorsTH.record(&AguiarWDR[0].soma.h_hh(0.5))
+	OutputTimesT = new Vector()
+	AguiarWDR[0].soma netconT = new NetCon(&v(0.5), nil)
+	netconT.threshold = -30 //-30 mv AP threshold.
+	netconT.record(OutputTimesT)
+	objref netconT
+
+	//OutputVectorsEX = new Vector() //needs to be modified to accomodate multiple cells.
+	//OutputVectorsEX.record(&AguiarIN[0].soma.v(0.5))
+	OutputTimesEX = new Vector()
+	AguiarIN[0].soma netconEX = new NetCon(&v(0.5), nil)
+	netconEX.threshold = -30 //-30 mv AP threshold.
+	netconEX.record(OutputTimesEX)
+	objref netconEX
+
+
+init()
+run()
+}
+
+
+proc Step(){ //Use something like this to probe internal variables, except replace "print" command with record command of some sort.
+	index = 1
+	finitialize(v_init)
+	while (t<tstop) {
+	print MelnickSG[1].soma.v(0.5)
+	fadvance()
+	}
+}
+
+
+//DEBUG NOTICE: Files containing time vectors are for now manually entered into VarWriter, as this makes debugging easier.  Later versions of this code will read appropriate filenames from a .dat template file in the style of "ReadFileXX" lines as shown below.
+
+objref DestFileSG, TimeFileSG, ReadFileSG, ReadTimeFileSG, TempVectorSG //ADDITION: Time File for recording of spike times out of different SG Cells.
+strdef SaveToMeSG
+
+proc saveSG(){ local k
+	DestFileSG = new File()
+	ReadFileSG = new File()
+	TimeFileSG = new File() // File for AP Time vector storage.
+	//TempVectorSG = new Vector()
+	//ReadFileSG.ropen("SG_Cell_filenames.dat") //MAKE SURE THIS NAME MATCHES THAT GENERATED USING 		FilenameGenerator.m 
+	
+	//for k=0, 2 { Only save 3 motor neurons.
+		//TempVectorSG = OutputVectorsSG
+		//ReadFileSG.scanstr(SaveToMeSG)
+		//DestFileSG.wopen(SaveToMeSG)
+		//TempVectorSG.fwrite(DestFileSG)
+		//DestFileSG.close()
+		strdef timefileSG
+		timefileSG = "SG_Cell_1_Times.dat"
+		TimeFileSG.wopen(timefileSG)
+		OutputTimesSG.fwrite(TimeFileSG)
+		TimeFileSG.close()
+	//}
+	ReadFileSG.close()
+	objref TempVectorSG
+	print "SG Done"
+}
+
+
+objref DestFileZ2, TimeFileZ2, ReadFileZ2, ReadTimeFileZ2, TempVectorZ2 //ADDITION: Time File for recording of spike times out of different SG Cells.
+strdef SaveToMeZ2
+
+proc saveZ2(){ local k
+	DestFileZ2 = new File()
+	ReadFileZ2 = new File()
+	TimeFileZ2 = new File() // File for AP Time vector storage.
+	//TempVectorZ2 = new Vector()
+	//ReadFileZ2.ropen("SGSCS_Cell_filenames.dat") //MAKE SURE THIS NAME MATCHES THAT GENERATED USING 	FilenameGenerator.m 
+	
+	//for k=0, 2 { Only save 3 motor neurons.
+		//TempVectorZ2 = OutputVectorsZ2
+		//ReadFileZ2.scanstr(SaveToMeZ2)
+		//DestFileZ2.wopen(SaveToMeZ2)
+		//TempVectorZ2.fwrite(DestFileZ2)
+		//DestFileZ2.close()
+		strdef timefileZ2
+		timefileZ2 = "SGSCS_Cell_1_Times.dat"
+		TimeFileZ2.wopen(timefileZ2)
+		OutputTimesZ2.fwrite(TimeFileZ2)
+		TimeFileZ2.close()
+	//}
+	ReadFileZ2.close()
+	objref TempVectorZ2
+	print "Z2 Done"
+}
+
+
+objref DestFileT, TimeFileT, ReadFileT, TempVectorT //ADDITION: Time File for recording of spike times out of different T Cells.
+strdef SaveToMeT
+
+proc saveT(){ local k
+	DestFileT = new File()
+	ReadFileT = new File()
+	TimeFileT = new File() // File for AP Time vector storage.
+	//TempVectorT = new Vector()
+	//ReadFileT.ropen("T_Cell_filenames.dat") //MAKE SURE THIS NAME MATCHES THAT GENERATED USING FilenameGenerator.m
+	//for k=0, 2 {  Only save 3 motor neurons.
+		//TempVectorT = OutputVectorsT
+		//ReadFileT.scanstr(SaveToMeT)
+		//DestFileT.wopen(SaveToMeT)
+		//TempVectorT.fwrite(DestFileT)
+		//DestFileT.close()
+		strdef timefileT
+		timefileT = "T_Cell_1_Times.dat"
+		TimeFileT.wopen(timefileT)
+		OutputTimesT.fwrite(TimeFileT)
+		TimeFileT.close()
+	//}
+	ReadFileT.close()
+	objref TempVectorT
+	print "T Done"
+}
+
+
+objref DestFileEX, TimeFileEX, ReadFileEX, TempVectorEX //ADDITION: Time File for recording of spike times out of different T Cells.
+strdef SaveToMeEX
+
+proc saveEX(){ local k
+	DestFileEX = new File()
+	ReadFileEX = new File()
+	TimeFileEX = new File() // File for AP Time vector storage.
+	//TempVectorEX = new Vector()
+	//ReadFileEX.ropen("EX_Cell_filenames.dat") //MAKE SURE THIS NAME MATCHES THAT GENERATED USING FilenameGenerator.m
+	//for k=0, 2 {  Only save 3 motor neurons.
+		//TempVectorEX = OutputVectorsEX
+		//ReadFileEX.scanstr(SaveToMeEX)
+		//DestFileEX.wopen(SaveToMeEX)
+		//TempVectorEX.fwrite(DestFileEX)
+		//DestFileEX.close()
+		strdef timefileEX
+		timefileEX = "EX_Cell_1_Times.dat"
+		TimeFileEX.wopen(timefileEX)
+		OutputTimesEX.fwrite(TimeFileEX)
+		TimeFileEX.close()
+	//}
+	ReadFileEX.close()
+	objref TempVectorEX
+	print "EX Done"
+}
+
+

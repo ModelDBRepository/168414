@@ -1,0 +1,8 @@
+proc synapses(){
+for num = 0, 14{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, 14{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+}

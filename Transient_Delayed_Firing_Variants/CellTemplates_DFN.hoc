@@ -1,0 +1,603 @@
+//xopen("$(NEURONHOME)/lib/hoc/noload.hoc")
+//pwman_place(20,21)
+load_file("nrngui.hoc")
+
+begintemplate MelnickSG
+
+ndend=1
+
+public soma, hillock, axon, dend
+public synlist, x, y, z, position, connect2target
+objref synlist, syn_
+create soma, hillock, axon, dend
+
+
+proc init(){
+access soma
+{diam=10 L=10 nseg=10} // area 100 um2 means mA/cm2 identical to nA 
+insert B_Na
+insert B_A
+insert B_DR
+insert KDR
+insert KDRI
+insert pas
+{gnabar_B_Na = 0.008 ena = 60 g_pas = 1.1e-05 e_pas = -70 gkbar_KDRI = 0.0043 ek = -84}
+
+access hillock
+{L=30 nseg=30 dsoma=1 daxon=0.5 diam(0:1)=dsoma:daxon} 
+insert B_Na
+insert B_A
+insert B_DR
+insert KDR
+insert KDRI
+insert pas
+{gnabar_B_Na = 3.45 ena = 60 g_pas = 1.1e-05 e_pas = -70 gkbar_KDRI = 0.076 ek = -84} // Tonic firing with maintained I-F characteristics.
+
+access axon
+{diam=0.001 L=0.001 nseg=50}
+insert B_Na
+insert B_A
+insert B_DR
+insert KDR
+insert KDRI
+insert pas
+{gnar_B_Na = 0 ena = 60 g_pas = 0 e_pas = -70 gkbar_KDRI = 0 ek = -84}
+
+access dend
+{nseg=50 diam=1.4 L = 1371}
+//	diam(0.43:1) = 4:0  // tapering of the distal dendrite
+//insert B_Na
+insert SS
+insert B_DR
+insert KDR
+insert KDRI	
+insert pas
+{gnabar_SS = 0 ena = 60 g_pas = 1.1e-05 e_pas = -70 gkbar_KDRI = 0.034 ek = -84}
+
+soma connect hillock(0),1
+hillock connect axon(0),1
+soma connect dend(0),0
+
+forall Ra = 80 
+
+synlist = new List()
+
+synapses()
+
+x = y = z = 0
+
+}
+
+objref SynapseID, SynapseFile, NumVec
+strdef SynapseIDFile
+
+proc synapses(){
+
+SynapseFile = new File()
+SynapseID = new File()
+SynapseID.ropen("SG_Cell_SynapseID.dat")
+SynapseID.scanstr(SynapseIDFile)
+SynapseID.close()
+NumVec = new Vector()
+
+SynapseFile.ropen(SynapseIDFile)
+NumVec.scantil(SynapseFile, -1e15)
+SynapseFile.close()
+
+for num = 0, NumVec.x[0]-1{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, NumVec.x[1]-1{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+
+
+}
+
+proc position() { local i
+  soma for i = 0, n3d()-1 {
+    pt3dchange(i, $1-x+x3d(i), $2-y+y3d(i), $3-z+z3d(i), diam3d(i))
+  }
+  x = $1  y = $2  z = $3
+}
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(1), $o1)
+  nc.threshold = -30
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+endtemplate MelnickSG
+
+
+//*NEW TEMPLATE*//
+//*NEW TEMPLATE*//
+//*NEW TEMPLATE*//
+
+
+begintemplate AguiarIN
+
+public soma, dend, hillock, axon, synlist, x, y, z, position, connect2target
+
+create soma, dend, hillock, axon
+
+objref synlist, syn_
+
+proc init() {
+//Looks like there is a narrow range of Na vs. BA that will allow me to get "delayed firing" behavior.
+    BAFactor = 0.25 //0.49 good.
+    NaFactor = 0.5
+    KFactor = 4
+    x = y = z = 0
+
+    create soma
+    soma {    
+	nseg = 3  
+	L = 20.0
+	diam = 20.0
+	
+	//HH channels: iNat and iK
+	insert HH2 {
+	    gnabar_HH2 = 0.00
+	    gkbar_HH2 = 0.0043*6/24*KFactor
+	    vtraub_HH2 = -55.0
+	}
+
+	insert B_A{
+	    gkbar_B_A =0.06*BAFactor //according to Wolff (1998) vs. Wolff 1997: A vs. Na in hillock, factor of 1/3.
+                            //  Extrapolate using 36-47% ratio to 0.06-0.08.
+
+	}
+
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 1.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+	
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.002 //0.002
+	}
+	
+	ek = -70.0
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    create dend
+    dend {    
+	nseg = 5    
+	L = 400.0  
+	diam = 3.0
+	
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 2.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+
+	//HH channels: iNat and iK
+	//NORMALLy not there.
+	insert HH2{
+	    gnabar_HH2 = 0.000
+	    gkbar_HH2 = 0.036 * KFactor // *5/6
+	}
+
+	insert B_A{
+	    gkbar_B_A = 0.01*BAFactor //Extrapolate to 0.01 assuming about 1/5 of current is here.
+	}
+	
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.002 //0.002
+	}
+	
+	ek = -70.0
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    
+    create hillock
+    hillock {   
+	nseg = 3  
+	L = 9.0
+	diam(0:1) = 2.0:1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 3.45*NaFactor //3.45 default.
+	    gkbar_HH2 = 0.076*KFactor
+	    vtraub_HH2 = -55.0
+	}
+
+	insert B_A{
+	    gkbar_B_A = 1.2*BAFactor //A current greater than DR current in hillock. 0 default. About 1/3 Na by Wolff 1997 vs. Wolff 1998.
+	}
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    create axon
+    axon {    
+	nseg = 5
+	L = 1000.0
+	diam = 1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 0.0
+	    gkbar_HH2 = 0.00	//0.06
+	    vtraub_HH2 = -55
+	}
+	
+	Ra = 150.0
+	
+	insert pas
+	g_pas = 4.2e-5
+	e_pas = -65.0
+    }
+    
+    
+    //CONNECTIONS
+    soma connect hillock(0),1
+    hillock connect axon(0),1
+    soma connect dend(0),0 
+
+    synlist = new List()
+    synapses()
+    
+}
+
+proc position() { local i
+  soma for i = 0, n3d()-1 {
+    pt3dchange(i, $1-x+x3d(i), $2-y+y3d(i), $3-z+z3d(i), diam3d(i))
+  }
+  x = $1  y = $2  z = $3
+}
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(1), $o1)
+  nc.threshold = -30
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+objref SynapseID, SynapseFile, NumVec
+strdef SynapseIDFile
+
+proc synapses(){
+
+SynapseFile = new File()
+SynapseID = new File()
+SynapseID.ropen("IN_Cell_SynapseID.dat")
+SynapseID.scanstr(SynapseIDFile)
+SynapseID.close()
+NumVec = new Vector()
+
+SynapseFile.ropen(SynapseIDFile)
+NumVec.scantil(SynapseFile, -1e15)
+SynapseFile.close()
+
+for num = 0, 29{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, 29{
+dend syn_ = new NMDA_DynSyn(0.5) syn_.tau_rise = 2 syn_.tau_decay = 100 synlist.append(syn_)
+}
+for num = 0, 29{
+dend syn_ = new NK1_DynSyn(0.5) syn_.tau_rise = 100 syn_.tau_decay = 3000 synlist.append(syn_)
+}
+for num = 0, 1{
+dend syn_ = new GABAa_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 20 syn_.e = -70 synlist.append(syn_)
+}
+for num = 0, 1{
+dend syn_ = new GABAa_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 20 syn_.e = -70 synlist.append(syn_)
+}
+
+}
+
+endtemplate AguiarIN
+
+
+//*NEW TEMPLATE*//
+//*NEW TEMPLATE*//
+//*NEW TEMPLATE*//
+
+//Created by Paulo Aguiar [pauloaguiar@fc.up.pt]
+
+// CREATE WDR NEURON
+
+begintemplate AguiarWDR
+
+public soma, dend, hillock, axon, x, y, z, position, connect2target
+public synlist
+objref syn_, synlist
+
+create soma, dend, hillock, axon
+
+proc init() {
+    
+    x = y = z = 0
+    cascale = 1
+
+    create soma    
+    soma {    
+	nseg = 3  
+	L = 20.0
+	diam = 20.0
+	
+	//HH channels: iNat and iK
+	insert HH2 { //No AP Initiation in the soma?
+		gnabar_HH2 = 0.000 //"Default" 0.08.  Melnick 0.008.
+		gkbar_HH2 = 0.0043*6/24  //0.3e-3 in P&D. "/4" is there in parallel with Safronov.
+		vtraub_HH2 = -55.0
+	}
+	
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 1.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+	//high-voltage activated long-lasting calcium current, L-type
+	insert iCaL {
+	    pcabar_iCaL = 0.0001 * cascale//0.0001- IMPORTANT: this current drives the (activity control) somatic iKCa current
+	}       
+	//non-specific current dependent on intracellular calcium concentration 
+	insert iCaAN {
+	    gbar_iCaAN = 0.0000 //0.00000
+	}    
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.0001 * cascale //0.0001
+	}
+	//sodium persistent current
+	insert iNaP {
+	    gnabar_iNaP = 0.0001 * cascale//0.0001
+	}    
+	insert B_A{
+	   gkbar_B_A = 0// Arbitrary value
+	}
+	insert pas{
+	g_pas = 4.2e-5
+	e_pas = -65.0
+	}
+
+	ek = -70.0
+	Ra = 150.0
+    }
+    
+    create dend
+    dend {    
+	nseg = 5    
+	L = 350.0        //Reduction from 400 L and 3 d for purpose of making IF Curve consistent.
+	diam = 2.5
+	
+	//intracellular Ca dynamics
+	insert CaIntraCellDyn {
+	    depth_CaIntraCellDyn = 0.1
+	    cai_tau_CaIntraCellDyn = 2.0
+	    cai_inf_CaIntraCellDyn = 50.0e-6
+	}
+	//high-voltage activated long-lasting calcium current, L-type
+	insert iCaL {
+	    pcabar_iCaL = 3e-5 * cascale //3.0e-5 IMPORTANT: this current is important for activity control (drives the iKCa current).  cascale currently set to 1.
+	}                 
+	//non-specific current dependent on intracellular calcium concentration 
+	insert iCaAN {
+	    gbar_iCaAN = 0.00007 * cascale * 1.3//0.00007; This is a sensible parameter
+	    //higher values of gbar_iCaAN produce graphs similar to Silviloti et al 93 cascale currently set to 1.
+	}        
+	//potassium current dependent on intracellular calcium concentration 
+	insert iKCa {
+	    gbar_iKCa = 0.001 * cascale//0.001; higher values place "holes" in the scatter plot, resulting from the cai bump after synaptic activation);
+		//naturally, lower values will lead to increased firing
+	}
+	
+	//NORMALLy not there.
+	insert HH2{
+	    gnabar_HH2 = 0.000
+	    gkbar_HH2 = 0.036 // *5/6
+	}
+
+
+	insert pas{
+	g_pas = 4.2e-5
+	e_pas = -65.0
+	}
+
+	ek = -70.0
+	Ra = 150.0
+    }
+    
+    
+    create hillock
+    hillock {   
+	nseg = 3  
+	L = 9 //Note that default is 3.
+	diam(0:1) = 2.0:1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 3.45 //Remember Melnick is 3.45.  "/4" is for surface area compensation.
+	    gkbar_HH2 = 0.076 // Default 0.04.  POss. need to scale by 0.25.  Check I-F with normal K.
+	    vtraub_HH2 = -55.0
+	}
+	insert B_A{
+	   gkbar_B_A = 0.0 // 0.036 Old Safronov Default.
+	}
+
+	insert pas{
+	   g_pas = 4.2e-5
+	   e_pas = -65.0
+	}
+
+	Ra = 150.0
+
+    }
+    
+    create axon
+    axon {    
+	nseg = 5
+	L = 1000 // 1000.0
+	diam = 1.0
+	
+	//HH channels: iNa,t and iK
+	insert HH2 {
+	    gnabar_HH2 = 0 //0.1
+	    gkbar_HH2 = 0	//0.04
+	    vtraub_HH2 = -55
+	}
+	insert pas{
+	g_pas = 0
+	e_pas = -65.0	
+	}
+
+	Ra = 150.0
+    }
+    
+    
+    //CONNECTIONS
+    soma connect hillock(0),1
+    hillock connect axon(0),1
+    soma connect dend(0),0 
+
+
+
+//MAKE SYNAPSES HERE (DENDRITE)  Use execute1(cmd) with syn_.thresh to set threshold.  I can also get rid of WeightsVec if conductances will be set here.
+    synlist = new List()
+    synapses()
+}
+
+objref SynapseID, SynapseFile, NumVec
+strdef SynapseIDFile
+
+proc synapses(){
+
+SynapseFile = new File()
+SynapseID = new File()
+SynapseID.ropen("T_Cell_SynapseID.dat")
+SynapseID.scanstr(SynapseIDFile)
+SynapseID.close()
+NumVec = new Vector()
+
+SynapseFile.ropen(SynapseIDFile)
+NumVec.scantil(SynapseFile, -1e15)
+SynapseFile.close()
+for num = 0, 14{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, 14{
+dend syn_ = new NMDA_DynSyn(0.5) syn_.tau_rise = 2 syn_.tau_decay = 100 synlist.append(syn_)
+}
+for num = 0, 14{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, 14{
+dend syn_ = new NMDA_DynSyn(0.5) syn_.tau_rise = 2 syn_.tau_decay = 100 synlist.append(syn_)
+}
+for num = 0, 29{
+dend syn_ = new NK1_DynSyn(0.5) syn_.tau_rise = 200 syn_.tau_decay = 3000 synlist.append(syn_)
+}
+for num = 0, 29{
+dend syn_ = new AMPA_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 5 synlist.append(syn_)
+}
+for num = 0, 29{
+dend syn_ = new NMDA_DynSyn(0.5) syn_.tau_rise = 2 syn_.tau_decay = 100 synlist.append(syn_)
+}
+for num = 0, 0{
+dend syn_ = new Glycine_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 10 synlist.append(syn_)
+}
+for num = 0, 0{
+dend syn_ = new GABAa_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 20 syn_.e = -70 synlist.append(syn_)
+}
+for num = 0, 0{
+dend syn_ = new GABAa_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 20 syn_.e = -70 synlist.append(syn_)
+}
+for num = 0, 0{
+dend syn_ = new GABAa_DynSyn(0.5) syn_.tau_rise = 0.1 syn_.tau_decay = 20 syn_.e = -70 synlist.append(syn_)
+}
+}
+
+proc position() { local i
+  soma for i = 0, n3d()-1 {
+    pt3dchange(i, $1-x+x3d(i), $2-y+y3d(i), $3-z+z3d(i), diam3d(i))
+  }
+  x = $1  y = $2  z = $3
+}
+obfunc connect2target() { localobj nc //$o1 target point process, optional $o2 returned NetCon
+  soma nc = new NetCon(&v(1), $o1)
+  nc.threshold = -30
+  if (numarg() == 2) { $o2 = nc } // for backward compatibility
+  return nc
+}
+
+endtemplate AguiarWDR
+
+begintemplate S_NetStim //DUMMY NetStims; These are only included because Syn objects must be connected to NetCon object.
+public pp, connect2target, x, y, z, position, is_art
+objref pp
+proc init() {
+  pp = new NetStim()
+    pp.interval = 0
+    pp.number = 0
+    pp.start = 0
+}
+func is_art() { return 1 }
+obfunc connect2target() { localobj nc
+  nc = new NetCon(pp, $o1)
+  if (numarg() == 2) { $o2 = nc }
+  return nc
+}
+proc position(){x=$1  y=$2  z=$3}
+endtemplate S_NetStim
+
+
+//Network specification interface
+objref cells, nclist, netcon
+{cells = new List()  nclist = new List()}
+
+func cell_append() {cells.append($o1)  $o1.position($2,$3,$4)
+	return cells.count - 1
+}
+
+func nc_append() {//srcindex, tarcelindex, synindex
+  if ($3 >= 0) {
+    netcon = cells.object($1).connect2target(cells.object($2).synlist.object($3))
+    netcon.weight = $4   netcon.delay = $5
+  }else{
+    netcon = cells.object($1).connect2target(cells.object($2).pp)
+    netcon.weight = $4   netcon.delay = $5
+  }
+  nclist.append(netcon)
+  return nclist.count - 1
+}
+
+
+//************************************************************************************
+//UNITS	    
+//Category									Variable			Units
+//Time											t							[ms]
+//Voltage										v							[mV]
+//Current										i							[mA/cm2] (distributed)	[nA] (point process)
+//Concentration							ko, ki, etc.	[mM]
+//Specific capacitance			cm						[uf/cm2]
+//Length										diam, L				[um]
+//Conductance								g							[S/cm2] (distributed)	[uS] (point process)
+//Cytoplasmic resistivity		Ra						[ohm cm]
+//Resistance								Ri						[10E6 ohm]

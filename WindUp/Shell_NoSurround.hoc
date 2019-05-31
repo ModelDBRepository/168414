@@ -1,0 +1,14 @@
+//Shell script to run 3 NEURON scripts that define cell templates, construct the network, and run the simulation with an input spike train.  Can Execute Shell to run single simulations (just run the shell script) and sequential or parallel simulations using DOS prompt and/or UNIX/LINUX prompt on a computing cluster.
+
+
+load_file("CellTemplates.hoc")
+load_file("MakeNetwork.hoc")
+load_file("RunSim_WindUp.hoc")
+
+OutputData()
+
+saveSG()
+saveT()
+saveEX()
+
+//quit()
