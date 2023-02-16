@@ -57,3 +57,5 @@ Foreman: Simply run "Shell" and files will output as they need to.
 Fig 3a in "WindUp" directory.
 Fig 5b in "A Fiber Inhibition" directory.
 Fig 7c in "Foreman SCS" directory.
+
+Updated 2/16/23 to include B_Adapt.mod
